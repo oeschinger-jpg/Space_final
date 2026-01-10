@@ -71,9 +71,10 @@ function playExplosionSound() {
 }
 
 // UI
-const scoreEl = document.getElementById("score");
-const livesEl = document.getElementById("lives");
-const bombsEl = document.getElementById("bombs");
+const ui = document.getElementById("gameWrapper");
+const scoreEl = ui.querySelector("#score");
+const livesEl = ui.querySelector("#lives");
+const bombsEl = ui.querySelector("#bombs");
 
 let score = 0;
 let gameStarted = false;
@@ -86,6 +87,8 @@ let boss2 = null;
 let gameState = "stage1"; 
 // "stage1" → "boss1" → "stage2" → "boss2" → "chaos" → "win"
 let stateTimer = 0;
+let finalBossSpawned = false;
+
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -146,6 +149,17 @@ let mouse = {
     y: canvas.height / 2
 };
 
+let mouseDown = false;
+
+addEventListener("mousedown", () => {
+    mouseDown = true;
+});
+
+addEventListener("mouseup", () => {
+    mouseDown = false;
+});
+
+
 window.addEventListener("keydown", e => {
     const key = e.key.toLowerCase();
 
@@ -183,10 +197,6 @@ window.addEventListener("keyup", e => {
 addEventListener("mousemove", e => {
     mouse.x = e.clientX;
     mouse.y = e.clientY;
-});
-
-addEventListener("mousedown", () => {
-    player.shoot();
 });
 
 addEventListener("fullscreenchange", () => {
@@ -1323,31 +1333,44 @@ function animate() {
             break;
 
         case "chaos":
-    // 0–10s: Schwärme
+
+            // CHAOS Wellen
             if (stateTimer % 30 === 0 && stateTimer < 600) {
                 for (let i = 0; i < 3; i++) {
                     enemies.push(new Enemy(Math.random() * canvas.width, -20));
                 }
             }
-            // 10–20s: Meteor-Regen
-            if (stateTimer > 600 && stateTimer < 1200) {
-                if (stateTimer % 15 === 0) {
-                    rocks.push(new Rock());
-                    rocks.push(new Rock());
+
+            if (stateTimer > 600 && stateTimer < 1200 && stateTimer % 15 === 0) {
+                rocks.push(new Rock());
+                rocks.push(new Rock());
+            }
+
+            // ===== CHAOS ENEMY2 SPAWNER =====
+            if (stateTimer > 600 && !finalBossSpawned) {
+
+            // Spawn-Rate steigt mit der Zeit
+                const spawnRate =
+                    stateTimer < 1200 ? 180 :     // alle 3 Sekunden
+                    stateTimer < 1600 ? 120 :     // alle 2 Sekunden
+                    60;                          // jede Sekunde (End-Chaos)
+
+                if (stateTimer % spawnRate === 0) {
+                    const count =
+                        stateTimer < 1200 ? 1 :
+                        stateTimer < 1600 ? 2 :
+                        3;
+
+                    for (let i = 0; i < count; i++) {
+                        enemies2.push(new Enemy2(
+                            Math.random() * (canvas.width - 100),
+                            40
+                        ));
+                    }
                 }
             }
-            // 20–30s: Mini-Boss Rush
-            if (stateTimer === 1200) {
-                for (let i = 0; i < 4; i++) {
-                    enemies2.push(new Enemy2(
-                        Math.random() * (canvas.width - 100),
-                        40
-                    ));
-                }
-            }
-            // 30s: Final Boss
-            // 30s: FINAL – Beide Bosse
-            if (stateTimer >= 1800 && !boss && !boss2) {
+            // ===== FINAL BOSSES =====
+            if (stateTimer >= 1800 && !finalBossSpawned) {
                 boss = new Boss();
                 boss.health = 1000;
                 boss.maxHealth = 1000;
@@ -1362,13 +1385,16 @@ function animate() {
                 stageText = "FINAL CHAOS";
                 showStage = true;
                 stageAlpha = 1;
+
+                finalBossSpawned = true;
             }
 
-            // Sieg
-            if (stateTimer > 1800 && !boss && !boss2) {
+            // ===== WIN CONDITION =====
+            if (finalBossSpawned && !boss && !boss2) {
                 endGame(true);
             }
         break;
+
     }
     let offsetX = 0;
     let offsetY = 0;
@@ -1385,6 +1411,9 @@ function animate() {
     drawStars();
     if (gameState === "stage2" || gameState === "boss2") drawBlueStars();
     player.update();
+        if (mouseDown && !gameOver && gameStarted) {
+        player.shoot();
+    }
     if (player.activeBomb) {
     player.activeBomb.update();
     }
