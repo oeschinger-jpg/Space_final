@@ -30,6 +30,17 @@ for (let i = 0; i < 40; i++) {
     });
 }
 
+const orangeStars = [];
+
+for (let i = 0; i < 50; i++) {
+    orangeStars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 1.8 + 0.8,
+        speed: Math.random() * 2 + 1
+    });
+}
+
 function drawStars() {
     c.fillStyle = "white";
     stars.forEach(s => {
@@ -45,6 +56,37 @@ function drawStars() {
         }
     });
 }
+
+function drawBlueStars() {
+    c.fillStyle = "#44aaff";
+    blueStars.forEach(s => {
+        c.beginPath();
+        c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        c.fill();
+
+        s.y += s.speed;
+        if (s.y > canvas.height) {
+            s.y = 0;
+            s.x = Math.random() * canvas.width;
+        }
+    });
+}
+
+function drawOrangeStars() {
+    c.fillStyle = "orange";
+    orangeStars.forEach(s => {
+        c.beginPath();
+        c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        c.fill();
+
+        s.y += s.speed;
+        if (s.y > canvas.height) {
+            s.y = 0;
+            s.x = Math.random() * canvas.width;
+        }
+    });
+}
+
 
 // ========================
 // Sound
@@ -75,6 +117,8 @@ const ui = document.getElementById("gameWrapper");
 const scoreEl = ui.querySelector("#score");
 const livesEl = ui.querySelector("#lives");
 const bombsEl = ui.querySelector("#bombs");
+const boss3Bombs = [];
+
 
 let score = 0;
 let gameStarted = false;
@@ -85,10 +129,8 @@ let stageAlpha = 1;
 let showStage = false;
 let boss2 = null;
 let gameState = "stage1"; 
-// "stage1" → "boss1" → "stage2" → "boss2" → "chaos" → "win"
 let stateTimer = 0;
 let finalBossSpawned = false;
-
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -113,10 +155,11 @@ function loadSprite(name, src) {
 loadSprite("player", "sprites/player.png");
 loadSprite("enemy", "sprites/enemy.png");
 loadSprite("enemy2", "sprites/enemy2.png");
+loadSprite("enemy3", "sprites/enemy3.png");
 loadSprite("boss", "sprites/boss.png");
 loadSprite("boss2", "sprites/boss2.png");
-loadSprite("bullet", "sprites/bullet.png");
-loadSprite("enemyBullet", "sprites/enemyBullet.png");
+loadSprite("boss3", "sprites/boss3.png");
+loadSprite("drone", "sprites/drone.png");
 loadSprite("orangePU", "sprites/orangePU.png");
 loadSprite("greenPU", "sprites/greenPU.png");
 loadSprite("purplePU", "sprites/purplePU.png");
@@ -262,6 +305,7 @@ function detonateBomb(x, y) {
             boss.health -= 50;
         }
     }
+    // Boss2 Schaden
     if (boss2 && !boss2.immun) {
         const dx = boss2.center.x - x;
         const dy = boss2.center.y - y;
@@ -281,21 +325,27 @@ function detonateBomb(x, y) {
             }
         }
     }
-}
+    // Boss3 Schaden
+    if (boss3) {
+        const dx = boss3.center.x - x;
+        const dy = boss3.center.y - y;
+        const dist = Math.hypot(dx, dy);
 
-function drawBlueStars() {
-    c.fillStyle = "#44aaff";
-    blueStars.forEach(s => {
-        c.beginPath();
-        c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-        c.fill();
+        if (dist < 400) {
+            boss3.health -= 400;   // starke Bombe
 
-        s.y += s.speed;
-        if (s.y > canvas.height) {
-            s.y = 0;
-            s.x = Math.random() * canvas.width;
+            if (boss3.health <= 0) {
+                const bx = boss3.center.x;
+                const by = boss3.center.y;
+                boss3 = null;
+                stats.bossesKilled++;
+                score += 25000;
+                scoreEl.textContent = score;
+                playExplosionSound();
+                createExplosion(bx, by, 200, "red");
+            }
         }
-    });
+    }
 }
 
 // ========================
@@ -320,7 +370,7 @@ class Player {
         this.height = config.height;
         this.speed = config.speed;
         this.lives = config.lives;
-        this.fireRate = 300;        // Zeit zwischen Schüssen
+        this.fireRate = 320;        // Zeit zwischen Schüssen
         this.lastShot = 0;
         this.bulletSize = 5;
         this.spread = false;
@@ -652,6 +702,109 @@ class Enemy2 {
             c.fillStyle = "purple";
             c.fillRect(this.position.x, this.position.y, this.width, this.height);
         }
+    }
+}
+
+class Enemy3 {
+    constructor(x, y) {
+        this.position = { x, y };
+        this.size = 150;
+        this.speed = 4.5;
+        this.hp = 3;
+    }
+
+    update() {
+        // Direkt auf den Spieler zielen
+        const angle = Math.atan2(
+            player.position.y - this.position.y,
+            player.position.x - this.position.x
+        );
+
+        this.position.x += Math.cos(angle) * this.speed;
+        this.position.y += Math.sin(angle) * this.speed;
+
+        this.draw();
+    }
+
+    draw() {
+        if (sprites.enemy3 && sprites.enemy3.complete) {
+            c.drawImage(
+                sprites.enemy3,
+                this.position.x - this.size / 2,
+                this.position.y - this.size / 2,
+                this.size,
+                this.size
+            );
+        } else {
+            // Fallback
+            c.fillStyle = "red";
+            c.beginPath();
+            c.arc(this.position.x, this.position.y, this.size / 2, 0, Math.PI * 2);
+            c.fill();
+        }
+    }
+}
+
+class Drone {
+    constructor(x, y) {
+        this.size = 150;
+        this.position = { x, y };
+        this.hp = 3;
+
+        const dirs = [
+            { x: 1, y: 0 }, { x: -1, y: 0 },
+            { x: 0, y: 1 }, { x: 0, y: -1 },
+            { x: 1, y: 1 }, { x: -1, y: 1 },
+            { x: 1, y: -1 }, { x: -1, y: -1 }
+        ];
+        const d = dirs[Math.floor(Math.random() * dirs.length)];
+        this.velocity = { x: d.x * 6, y: d.y * 6 };
+
+        this.lastShot = 0;
+    }
+
+    update() {
+        this.position.x += this.velocity.x;
+        this.position.y += this.velocity.y;
+
+        if (this.position.x < 0 || this.position.x > canvas.width - this.size) this.velocity.x *= -1;
+        if (this.position.y < 0 || this.position.y > canvas.height - this.size) this.velocity.y *= -1;
+
+        // High-rate random shooting
+        if (Date.now() - this.lastShot > 150) {
+            this.shoot();
+            this.lastShot = Date.now();
+        }
+
+        this.draw();
+    }
+
+    shoot() {
+        const angle = Math.random() * Math.PI * 2;
+        projectiles.push(new Projectile({
+            x: this.position.x + this.size / 2,
+            y: this.position.y + this.size / 2,
+            vx: Math.cos(angle) * 6,
+            vy: Math.sin(angle) * 6,
+            fromEnemy: true,
+            radius: 5
+        }));
+    }
+
+    draw() {
+        if (sprites.drone && sprites.drone.complete) {
+            c.drawImage(sprites.drone, this.position.x, this.position.y, this.size, this.size);
+        } else {
+            c.fillStyle = "cyan";
+            c.fillRect(this.position.x, this.position.y, this.size, this.size);
+        }
+    }
+
+    get center() {
+        return {
+            x: this.position.x + this.size / 2,
+            y: this.position.y + this.size / 2
+        };
     }
 }
 
@@ -1115,6 +1268,156 @@ class Boss2 {
     }
 }
 
+class Boss3 {
+    constructor() {
+        this.size = 350;
+        this.position = {
+            x: canvas.width / 2 - this.size / 2,
+            y: 50
+        };
+
+        this.speed = 0.8;
+        this.maxHealth = 3000;
+        this.health = this.maxHealth;
+        this.phase = 1;
+        this.lastDrone = 0;
+        this.lastBomb = 0;
+
+        // Laser
+        this.laserCharge = 0;
+        this.laserActive = false;
+        this.laserAngle = 0;
+    }
+
+    get center() {
+        return {
+            x: this.position.x + this.size / 2,
+            y: this.position.y + this.size / 2
+        };
+    }
+
+    update() {
+        // Phase 2 ab 50% HP
+        if (this.health <= this.maxHealth * 0.5) {
+            this.phase = 2;
+        }
+
+        // Slow follow
+        const angle = Math.atan2(
+            player.position.y - this.center.y,
+            player.position.x - this.center.x
+        );
+        this.position.x += Math.cos(angle) * this.speed;
+        this.position.y += Math.sin(angle) * this.speed;
+
+        // Spawn drone every 5 sec
+        if (Date.now() - this.lastDrone > 5000) {
+            drones.push(new Drone(this.center.x - 30, this.center.y - 30));
+            this.lastDrone = Date.now();
+        }
+
+        // Phase 2 Bomben
+        if (this.phase === 2 && Date.now() - this.lastBomb > 1500) {
+            this.shootBomb();
+            this.lastBomb = Date.now();
+        }
+
+        // Laser
+        if (!this.laserActive && Math.random() < 0.01) {
+            this.startLaser();
+        }
+
+        this.updateLaser();
+        this.draw();
+
+        // Touch = instant death
+        if (distance(this.center, player.position) < 120) {
+            endGame(false);
+        }
+    }
+
+    startLaser() {
+        playSound("laser");
+        this.laserCharge = 80;
+        this.laserActive = true;
+        this.laserAngle = Math.atan2(
+            player.position.y - this.center.y,
+            player.position.x - this.center.x
+        );
+    }
+
+    shootBomb() {
+        const angle = Math.random() * Math.PI * 2;
+
+        boss3Bombs.push({
+            position: { x: this.center.x, y: this.center.y },
+            velocity: {
+                x: Math.cos(angle) * 5,
+                y: Math.sin(angle) * 5
+            },
+            timer: 90
+        });
+    }
+
+    updateLaser() {
+        if (!this.laserActive) return;
+        this.laserCharge--;
+
+        if (this.laserCharge > 30) {
+            this.drawLaser("rgba(255,255,0,0.4)", 4);
+        } else {
+            this.drawLaser("red", 12);
+            this.checkLaserHit();
+        }
+
+        if (this.laserCharge <= 0) this.laserActive = false;
+    }
+
+    drawLaser(color, width) {
+        c.strokeStyle = color;
+        c.lineWidth = width;
+        c.beginPath();
+        c.moveTo(this.center.x, this.center.y);
+        c.lineTo(
+            this.center.x + Math.cos(this.laserAngle) * 2000,
+            this.center.y + Math.sin(this.laserAngle) * 2000
+        );
+        c.stroke();
+    }
+
+    checkLaserHit() {
+        const dx = player.position.x - this.center.x;
+        const dy = player.position.y - this.center.y;
+        const dist = Math.abs(
+            Math.sin(this.laserAngle) * dx -
+            Math.cos(this.laserAngle) * dy
+        );
+
+        if (dist < 25 && !player.isDashing) {
+            endGame(false);
+        }
+    }
+
+    draw() {
+        if (sprites.boss3 && sprites.boss3.complete) {
+            c.drawImage(sprites.boss3, this.position.x, this.position.y, this.size, this.size);
+        } else {
+            c.fillStyle = "black";
+            c.fillRect(this.position.x, this.position.y, this.size, this.size);
+        }
+        // HP Bar
+        const barWidth = 300;
+        const hp = this.health / this.maxHealth;
+
+        c.fillStyle = "black";
+        c.fillRect(canvas.width / 2 - barWidth / 2, 20, barWidth, 16);
+
+        c.fillStyle = "red";
+        c.fillRect(canvas.width / 2 - barWidth / 2, 20, barWidth * hp, 16);
+
+    }
+}
+
 // ========================
 // Rock
 // ========================
@@ -1243,22 +1546,26 @@ let player;
 const projectiles = [];
 const enemies = [];
 const enemies2 = [];
+const enemies3 = [];
 const powerUps = [];
 const rocks = [];
 const particles = [];
+let boss3 = null;
+const drones = [];
+
 
 // ========================
 // SPAWN ENEMIES & POWERUPS
 // ========================
 
 setInterval(() => {
-    if (gameState === "stage1" || gameState === "stage2") {
+    if (gameState === "stage1" || gameState === "stage2" || gameState === "stage3") {
         enemies.push(new Enemy(Math.random() * canvas.width, -20));
     }
-}, 600); // alle 0,6 sek ein enemy1
+}, 600); // alle 0,6 sek ein enemy1 ind stage 1,2,3
 
 setInterval(() => {
-    if (gameState === "stage2") {
+    if (gameState === "stage2" || gameState === "stage3") {
         enemies2.push(
             new Enemy2(
                 Math.random() * (canvas.width - 100),
@@ -1266,7 +1573,19 @@ setInterval(() => {
             )
         );
     }
-}, 2500); // alle 4 Sekunden ein enemy2 in stage 2
+}, 2500); // alle 2,5 Sekunden ein enemy2 in stage 2,3
+
+setInterval(() => {
+    if (gameState === "stage3") {
+        enemies3.push(
+            new Enemy3(
+                Math.random() * canvas.width,
+                -50
+            )
+        );
+    }
+}, 3500); // alle 3,5 Sekunden ein enemy3 in stage 3
+
 
 setInterval(() => {
     rocks.push(new Rock());
@@ -1324,6 +1643,24 @@ function animate() {
 
         case "boss2":
             if (!boss2) {
+                gameState = "stage3";
+                stageText = "STAGE 3";
+                showStage = true;
+                stageAlpha = 1;
+                stateTimer = 0;
+            }
+            break;
+
+        case "stage3":
+            if (stateTimer > 1800) {   // 30 Sekunden
+                boss3 = new Boss3();
+                gameState = "boss3";
+                stateTimer = 0;
+            }
+            break;
+        
+        case "boss3":
+            if (!boss3) {
                 gameState = "chaos";
                 stageText = "CHAOS STAGE";
                 showStage = true;
@@ -1410,6 +1747,7 @@ function animate() {
     c.fillRect(-offsetX, -offsetY, canvas.width, canvas.height);
     drawStars();
     if (gameState === "stage2" || gameState === "boss2") drawBlueStars();
+    if (gameState === "stage3" || gameState === "boss3") drawOrangeStars();
     player.update();
         if (mouseDown && !gameOver && gameStarted) {
         player.shoot();
@@ -1503,7 +1841,7 @@ function animate() {
         if (p.life <= 0) particles.splice(i, 1);
     });
 
-    // Enemies
+    // Enemy1
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const e = enemies[ei];
         e.update();
@@ -1524,8 +1862,7 @@ function animate() {
             }
         }
     }
-
-
+    // Enemy2
     for (let i = enemies2.length - 1; i >= 0; i--) {
         const e = enemies2[i];
         e.update();
@@ -1549,6 +1886,82 @@ function animate() {
                 scoreEl.textContent = score;
                 break;
             }
+        }
+    }
+    // Enemy3
+    for (let i = enemies3.length - 1; i >= 0; i--) {
+        const e = enemies3[i];
+        e.update();
+
+        // Player Kollision → Explosion & Schaden
+        if (distance(e.position, player.position) < 35) {
+            createExplosion(e.position.x, e.position.y, 40, "red");
+            playExplosionSound();
+            enemies3.splice(i, 1);
+
+            if (!player.isDashing) {
+                if (player.shield > 0) {
+                    player.shield -= 50;
+                } else {
+                    player.lives--;
+                    livesEl.textContent = player.lives;
+                    if (player.lives <= 0) endGame(false);
+                }
+            }
+            continue;
+        }
+
+        // Projektile treffen Enemy3
+        for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+            const p = projectiles[pi];
+
+            if (!p.fromEnemy && distance(p.position, e.position) < e.size / 2) {
+
+                // Big PowerUp = One-Shot
+                if (player.bulletSize > 5) {
+                e.hp = 0;
+                } else {
+                    e.hp--;
+                }
+
+                projectiles.splice(pi, 1);
+
+                if (e.hp <= 0) {
+                    createExplosion(e.position.x, e.position.y, 50, "orange");
+                    playExplosionSound();
+                    enemies3.splice(i, 1);
+                    score += 200;
+                    scoreEl.textContent = score;
+                }
+                break;
+            }
+        }
+    }
+
+    // ===== DRONES =====
+    for (let i = drones.length - 1; i >= 0; i--) {
+        const d = drones[i];
+        d.update();
+
+        // Player bullets hit drones
+        for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+            const p = projectiles[pi];
+            if (!p.fromEnemy && distance(p.position, d.center) < d.size / 2) {
+                projectiles.splice(pi, 1);
+                d.hp--;
+
+                if (d.hp <= 0) {
+                    createExplosion(d.position.x, d.position.y, 50, "cyan");
+                    playExplosionSound();
+                    drones.splice(i, 1);
+                }
+                break;
+            }
+        }
+
+        // Drone touches player
+        if (distance(d.center, player.position) < d.size / 2 && !player.isDashing) {
+            endGame(false);
         }
     }
 
@@ -1599,6 +2012,7 @@ function animate() {
         }
 
     }
+
     if (boss2) {
         boss2.update();
         if (boss2 && boss2.immun && boss2.minionsAlive <= 0) {
@@ -1610,6 +2024,56 @@ function animate() {
         }
     }
 
+    if (boss3) {
+    boss3.update();
+
+    for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+        const p = projectiles[pi];
+        if (!p.fromEnemy) {
+
+            const dx = p.position.x - boss3.center.x;
+            const dy = p.position.y - boss3.center.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < boss3.size / 2) {
+                projectiles.splice(pi, 1);
+                boss3.health -= p.damage;
+
+                if (boss3.health <= 0) {
+                    createExplosion(boss3.center.x, boss3.center.y, 200, "red");
+                    playExplosionSound();
+                    boss3 = null;
+                    stats.bossesKilled++;
+                }
+            }
+        }
+    }
+    }
+
+    // ===== BOSS3 BOMBS =====
+    for (let i = boss3Bombs.length - 1; i >= 0; i--) {
+        const b = boss3Bombs[i];
+
+        b.position.x += b.velocity.x;
+        b.position.y += b.velocity.y;
+        b.timer--;
+
+        // draw bomb with red glow
+        c.shadowColor = "red";
+        c.shadowBlur = 25;
+        c.drawImage(sprites.bomb, b.position.x - 16, b.position.y - 16, 32, 32);
+        c.shadowBlur = 0;
+
+        if (b.timer <= 0) {
+            createExplosion(b.position.x, b.position.y, 120, "red");
+
+            if (distance(b.position, player.position) < 180) {
+                endGame(false);
+            }
+
+            boss3Bombs.splice(i, 1);
+        }
+    }
 
     // PowerUps
     for (let pi = powerUps.length - 1; pi >= 0; pi--) {
@@ -1638,18 +2102,28 @@ function activatePowerUp(type) {
             break;
 
         case "rapid":
-            player.fireRate = 80;
-            setTimeout(() => player.fireRate = 300, 10000);
+            player.fireRate = 90;
+
+            clearTimeout(player.rapidTimer);
+            player.rapidTimer = setTimeout(() => {
+                player.fireRate = 450;
+            }, 10000);
             break;
 
         case "big":
             player.bulletSize = 12;
-            setTimeout(() => player.bulletSize = 5, 10000);
+            clearTimeout(player.bigTimer);
+            player.bigTimer = setTimeout(() => {
+                player.bulletSize = 5;
+            }, 10000);
             break;
 
         case "spread":
             player.spread = true;
-            setTimeout(() => player.spread = false, 10000);
+            clearTimeout(player.spreadTimer);
+            player.spreadTimer = setTimeout(() => {
+                player.spread = false;
+            }, 10000);
             break;
 
         case "shield":
