@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>FH Space Shooter</title>
+<style>
+    html, body {
+        margin: 0;
+        overflow: hidden;
+        background: black;
+        color: white;
+        font-family: Arial, sans-serif;
+    }
+    #ui {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+    }
+</style>
+</head>
+<body>
+
+<div id="ui">
+    Score: <span id="score">0</span> |
+    Lives: <span id="lives">3</span> |
+    Bombs: <span id="bombs">1</span>
+</div>
+
+<div id="gameWrapper">
+    <canvas></canvas>
+
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div>Bombs: <span id="bombs">1</span></div>
+    </div>
+</div>
+
+<canvas id="game" tabindex="1"></canvas>
+
+<script src="game.js"></script>
+
+</body>
+</html>
