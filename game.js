@@ -133,6 +133,7 @@ let gameState = "stage1";
 let stateTimer = 0;
 let finalBossSpawned = false;
 let paused = false;
+let justRespawned = false;
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -416,7 +417,24 @@ function drawPauseScreen() {
     }
 }
 
+function takeDamage(amount = 1) {
+    if (player.isDashing) return;
 
+    if (player.shield > 0) {
+        player.shield -= 40;
+        if (player.shield < 0) player.shield = 0;
+        return;
+    }
+
+    player.lives -= amount;
+    livesEl.textContent = player.lives;
+
+    startShake(10, 10);
+
+    if (player.lives <= 0) {
+        respawnAtStage();
+    }
+}
 
 // ========================
 // SIMPLE PIXEL SPRITES
@@ -432,6 +450,7 @@ function drawShip(x, y, size, color) {
 }
 
 function respawnAtStage() {
+    justRespawned = true;
     // Score reset
     score = 0;
     scoreEl.textContent = score;
@@ -1140,17 +1159,7 @@ class Boss {
         );
 
         if (dist < 20) {
-            if (player.isDashing) return;
-
-            if (player.shield > 0) {
-                player.shield -= 25;
-                if (player.shield < 0) player.shield = 0;
-            } else {
-                startShake(12, 12);
-                player.lives--;
-                livesEl.textContent = player.lives;
-                if (player.lives <= 0) respawnAtStage();
-            }
+            takeDamage(1);
         }
     }
 
@@ -1376,17 +1385,7 @@ class Boss2 {
         );
 
         if (dist < 22) {
-            if (player.isDashing) return;
-
-            if (player.shield > 0) {
-                player.shield -= 30;
-                if (player.shield < 0) player.shield = 0;
-            } else {
-                startShake(14, 14);
-                player.lives--;
-                livesEl.textContent = player.lives;
-                if (player.lives <= 0) respawnAtStage();
-            }
+            takeDamage(1);
         }
     }
 }
@@ -1517,7 +1516,7 @@ class Boss3 {
         );
 
         if (dist < 25 && !player.isDashing) {
-            respawnAtStage();
+            takeDamage(1);
         }
     }
 
@@ -1740,6 +1739,11 @@ function distance(a, b) {
 
 function animate() {
     if (!gameStarted || gameOver) return;
+    if (justRespawned) {
+        justRespawned = false;
+        requestAnimationFrame(animate);
+        return;
+    }
     if (paused) {
         c.setTransform(1, 0, 0, 1, 0, 0);
         c.globalAlpha = 1;   // 🔥 ganz wichtig
@@ -1903,7 +1907,7 @@ function animate() {
             return; // wichtig, damit kein weiterer Code auf diesem Rock läuft
         }
 
-        // Spieler trifft Felsen → sofort tot
+        // Spieler trifft Felsen → -1 life
         const playerRadius = 20;
 
         if (
@@ -1912,8 +1916,9 @@ function animate() {
             player.position.y > r.position.y - playerRadius &&
             player.position.y < r.position.y + r.size + playerRadius
         ) {
-        respawnAtStage();
-    }
+        takeDamage(1);
+        rocks.splice(ri, 1);   // Rock verschwindet
+        }
 });
 
     // Projectiles
@@ -2099,7 +2104,9 @@ function animate() {
 
         // Drone touches player
         if (distance(d.center, player.position) < d.size / 2 && !player.isDashing) {
-            respawnAtStage();
+            takeDamage(1);
+            drones.splice(i, 1);   // Drone stirbt
+            return;
         }
     }
 
@@ -2206,9 +2213,8 @@ function animate() {
             createExplosion(b.position.x, b.position.y, 120, "red");
 
             if (distance(b.position, player.position) < 180) {
-                respawnAtStage();
+                takeDamage(1);
             }
-
             boss3Bombs.splice(i, 1);
         }
     }
