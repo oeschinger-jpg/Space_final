@@ -267,9 +267,19 @@ addEventListener("resize", resizeCanvas);
 // Hilfsfunktionen
 // ========================
 
-function createExplosion(x, y, size = 20, color = "orange") {
-    for (let i = 0; i < size; i++) {
-        particles.push(new Particle(x, y, color, 4));
+function createExplosion(x, y, amount = 20, color = "orange") {
+    for (let i = 0; i < amount; i++) {
+
+        // Cap erreicht → älteste Partikel recyceln
+        if (particles.length >= MAX_PARTICLES) {
+            const p = particles.shift();
+            p.reset(x, y, color, 4);
+            particles.push(p);
+        } 
+        // Noch Platz → neue erstellen
+        else {
+            particles.push(new Particle(x, y, color, 4));
+        }
     }
 }
 
@@ -1463,8 +1473,8 @@ class Boss3 {
         this.position.x += Math.cos(angle) * this.speed;
         this.position.y += Math.sin(angle) * this.speed;
 
-        // Spawn drone every 5 sec
-        if (Date.now() - this.lastDrone > 5000) {
+        // Spawn drone every 5 sec (capped)
+        if (Date.now() - this.lastDrone > 5000 && drones.length < 3) {
             drones.push(new Drone(this.center.x - 30, this.center.y - 30));
             this.lastDrone = Date.now();
         }
@@ -1618,6 +1628,10 @@ class Rock {
 
 class Particle {
     constructor(x, y, color, size) {
+        this.reset(x, y, color, size);
+    }
+
+    reset(x, y, color, size) {
         this.position = { x, y };
         this.velocity = {
             x: (Math.random() - 0.5) * 6,
@@ -1708,6 +1722,7 @@ const enemies3 = [];
 const powerUps = [];
 const rocks = [];
 const particles = [];
+const MAX_PARTICLES = 400;
 let boss3 = null;
 const drones = [];
 
@@ -1719,16 +1734,23 @@ const drones = [];
 setInterval(() => {
     if (paused || !gameStarted || gameOver) return;
 
-    if (gameState === "stage1" || gameState === "stage2" || gameState === "stage3") {
+    if (
+        (gameState === "stage1" || gameState === "stage2" || gameState === "stage3") &&
+        enemies.length < 20
+    ) {
         enemies.push(new Enemy(Math.random() * canvas.width, -20));
     }
 }, 600);
+
  // alle 0,6 sek ein enemy1 ind stage 1,2,3
 
 setInterval(() => {
     if (paused || !gameStarted || gameOver) return;
 
-    if (gameState === "stage2" || gameState === "stage3") {
+    if (
+        (gameState === "stage2" || gameState === "stage3") &&
+        enemies2.length < 10
+    ) {
         enemies2.push(
             new Enemy2(Math.random() * (canvas.width - 100), 40)
         );
@@ -2028,18 +2050,25 @@ function animate() {
         }
     };
 
-    particles.forEach((p, i) => {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
         p.update();
         p.draw();
-        if (p.life <= 0) particles.splice(i, 1);
-    });
+
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
 
     // Enemy1
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const e = enemies[ei];
         e.update();
         e.shoot();
-
+        if (e.position.y > canvas.height + 100) {
+            enemies.splice(ei, 1);
+            continue;
+        }
             for (let pi = projectiles.length - 1; pi >= 0; pi--) {
             const p = projectiles[pi];
 
