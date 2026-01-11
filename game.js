@@ -304,58 +304,67 @@ function detonateBomb(x, y) {
             stats.enemiesKilled++;
             score += 100;
             playExplosionSound();
-        }
-    });
+            }
+        });
 
-    // Boss Schaden
-    if (boss) {
-        const dx = boss.centerX - x;
-        const dy = boss.centerY - y;
-        const dist = Math.hypot(dx, dy);
+        // Boss Schaden
+        if (boss) {
+            const dx = boss.centerX - x;
+            const dy = boss.centerY - y;
+            const dist = Math.hypot(dx, dy);
 
-        if (dist < 400) {
+            if (dist < 400) {
             boss.health -= 50;
-        }
-    }
-    // Boss2 Schaden
-    if (boss2 && !boss2.immun) {
-        const dx = boss2.center.x - x;
-        const dy = boss2.center.y - y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 400) {
-            boss2.health -= 250;
-
-            if (boss2.health <= 0) {
-                const bx = boss2.center.x;
-                const by = boss2.center.y;
-                boss2 = null;
-                stats.bossesKilled++;
-                score += 10000;
-                scoreEl.textContent = score;
-                playExplosionSound();
-                createExplosion(bx, by, 150, "purple");
             }
         }
-    }
-    // Boss3 Schaden
-    if (boss3) {
-        const dx = boss3.center.x - x;
-        const dy = boss3.center.y - y;
-        const dist = Math.hypot(dx, dy);
+        // Boss2 Schaden
+        if (boss2 && !boss2.immun) {
+            const dx = boss2.center.x - x;
+            const dy = boss2.center.y - y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 400) {
+                boss2.health -= 250;
 
-        if (dist < 400) {
-            boss3.health -= 400;   // starke Bombe
-
-            if (boss3.health <= 0) {
-                const bx = boss3.center.x;
-                const by = boss3.center.y;
-                boss3 = null;
-                stats.bossesKilled++;
-                score += 25000;
-                scoreEl.textContent = score;
-                playExplosionSound();
-                createExplosion(bx, by, 200, "red");
+                if (boss2.health <= 0) {
+                    const bx = boss2.center.x;
+                    const by = boss2.center.y;
+                    boss2 = null;
+                    stats.bossesKilled++;
+                    score += 10000;
+                    scoreEl.textContent = score;
+                    playExplosionSound();
+                    createExplosion(bx, by, 150, "purple");
+                }
             }
+        }
+        // Boss3 Schaden
+        if (boss3) {
+            const dx = boss3.center.x - x;
+            const dy = boss3.center.y - y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 400) {
+                boss3.health -= 400;   // starke Bombe
+
+                if (boss3.health <= 0) {
+                    const bx = boss3.center.x;
+                    const by = boss3.center.y;
+                    boss3 = null;
+                    stats.bossesKilled++;
+                    score += 25000;
+                    scoreEl.textContent = score;
+                    playExplosionSound();
+                    createExplosion(bx, by, 200, "red");
+                }
+            }
+        }
+        // 🔥 damage drones
+        for (let i = drones.length - 1; i >= 0; i--) {
+        const d = drones[i];
+        if (distance({ x, y }, d.center) < 600) {
+            createExplosion(d.position.x, d.position.y, 40, "cyan");
+            playExplosionSound();
+            drones.splice(i, 1);
         }
     }
 }
@@ -2102,11 +2111,11 @@ function animate() {
             }
         }
 
-        // Drone touches player
-        if (distance(d.center, player.position) < d.size / 2 && !player.isDashing) {
+        // Drone touches player → -1 life, no crash
+        if (distance(d.center, player.position) < d.size / 2) {
             takeDamage(1);
-            drones.splice(i, 1);   // Drone stirbt
-            return;
+            drones.splice(i, 1);
+            break;   // 🔥 NUR diese Schleife verlassen, nicht animate()
         }
     }
 
