@@ -30,17 +30,6 @@ for (let i = 0; i < 40; i++) {
     });
 }
 
-const orangeStars = [];
-
-for (let i = 0; i < 50; i++) {
-    orangeStars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 1.8 + 0.8,
-        speed: Math.random() * 2 + 1
-    });
-}
-
 function drawStars() {
     c.fillStyle = "white";
     stars.forEach(s => {
@@ -70,26 +59,6 @@ function drawBlueStars() {
             s.x = Math.random() * canvas.width;
         }
     });
-}
-
-function drawOrangeStars() {
-    c.save();
-    c.scale(0.5, 0.5);
-    c.fillStyle = "orange";
-
-    orangeStars.forEach(s => {
-        c.beginPath();
-        c.arc(s.x * 2, s.y * 2, s.size * 2, 0, Math.PI * 2);
-        c.fill();
-
-        s.y += s.speed;
-        if (s.y > canvas.height) {
-            s.y = 0;
-            s.x = Math.random() * canvas.width;
-        }
-    });
-
-    c.restore();
 }
 
 // ========================
@@ -141,6 +110,7 @@ let justRespawned = false;
 let boss3JustDied = false;
 let abortFrame = false;
 let pendingRespawn = false;
+let boss3Dead = false;
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -1843,6 +1813,10 @@ function animate() {
         requestAnimationFrame(animate);
         return;
     }
+    if (boss3Dead) {
+    // Skip all boss3 related logic
+    c.setTransform(1,0,0,1,0,0);
+}
 
     if (!document.hasFocus()) {
         for (let k in keys) keys[k] = false;
@@ -1982,7 +1956,6 @@ function animate() {
     c.fillRect(-offsetX, -offsetY, canvas.width, canvas.height);
     drawStars();
     if (gameState === "stage2" || gameState === "boss2") drawBlueStars();
-    if (gameState === "stage3" || gameState === "boss3") drawOrangeStars();
     player.update();
         if (mouseDown && !gameOver && gameStarted) {
         player.shoot();
@@ -2177,6 +2150,9 @@ function animate() {
 
     // ===== DRONES =====
     for (let i = drones.length - 1; i >= 0; i--) {
+        if (boss3Dead) {
+            drones.length = 0;
+        }
         const d = drones[i];
         d.update();
 
@@ -2286,38 +2262,67 @@ function animate() {
                 projectiles.splice(pi, 1);
                 boss3.health -= p.damage;
 
-                if (boss3.health <= 0) {
-                    createExplosion(boss3.center.x, boss3.center.y, 200, "red");
+                if (boss3.health <= 0 && !boss3Dead) {
+                    boss3Dead = true;
+
+                    const cx = boss3.center.x;
+                    const cy = boss3.center.y;
+
+                    createExplosion(cx, cy, 250, "red");
+                    createExplosion(cx, cy, 120, "white");
                     playExplosionSound();
+
+                    // Hard cleanup
                     boss3 = null;
-                    stats.bossesKilled++;
+                    boss3Bombs.length = 0;
+                    drones.length = 0;
+                    enemies3.length = 0;
+                    projectiles.length = 0;
+
+                    // Stage change
+                    gameState = "chaos";
+                    stateTimer = 0;
+                    stageText = "CHAOS STAGE";
+                    showStage = true;
+                    stageAlpha = 1;
+
+                    requestAnimationFrame(animate);
+                    return;   // 🔥 STOP FRAME HIER
+                    }   
                 }
-            }
+            }  
         }
-    }
     }
 
     // ===== BOSS3 BOMBS =====
-    for (let i = boss3Bombs.length - 1; i >= 0; i--) {
-        const b = boss3Bombs[i];
-
-        b.position.x += b.velocity.x;
-        b.position.y += b.velocity.y;
-        b.timer--;
-
-        // draw bomb with red glow
-        c.shadowColor = "red";
-        c.shadowBlur = 25;
-        c.drawImage(sprites.bomb, b.position.x - 16, b.position.y - 16, 32, 32);
-        c.shadowBlur = 0;
-
-        if (b.timer <= 0) {
-            createExplosion(b.position.x, b.position.y, 120, "red");
-
-            if (distance(b.position, player.position) < 180) {
-                takeDamage(1);
+    if (!boss3) {
+        boss3Bombs.length = 0;
+    } else {
+        for (let i = boss3Bombs.length - 1; i >= 0; i--) {
+            if (!boss3 || boss3Dead) {
+                boss3Bombs.length = 0;
             }
-            boss3Bombs.splice(i, 1);
+
+            const b = boss3Bombs[i];
+
+            b.position.x += b.velocity.x;
+            b.position.y += b.velocity.y;
+            b.timer--;
+
+            // draw bomb with red glow
+            c.shadowColor = "red";
+            c.shadowBlur = 25;
+            c.drawImage(sprites.bomb, b.position.x - 16, b.position.y - 16, 32, 32);
+            c.shadowBlur = 0;
+
+            if (b.timer <= 0) {
+                createExplosion(b.position.x, b.position.y, 120, "red");
+
+                if (distance(b.position, player.position) < 180) {
+                    takeDamage(1);
+                }
+                boss3Bombs.splice(i, 1);
+            }
         }
     }
 
