@@ -786,7 +786,7 @@ class Enemy {
 
 
     update() {
-    let speed = player.enemySlow ? 0.2 : 0.6;
+    let speed = player.enemySlow ? 0.2 : 0.8;
     this.position.y += speed;
     this.draw();
     }
@@ -1926,7 +1926,7 @@ function animate() {
 
             // ===== WIN CONDITION =====
             if (finalBossSpawned && !boss && !boss2) {
-                respawnAtStage();
+                endGame(true);
             }
         break;
 
@@ -2141,16 +2141,22 @@ function animate() {
             const p = projectiles[pi];
             if (!p.fromEnemy && distance(p.position, d.center) < d.size / 2) {
                 projectiles.splice(pi, 1);
-                d.hp--;
+
+                // Big PowerUp → One-Shot
+                if (player.bulletSize > 5) {
+                    d.hp = 0;
+                } else {
+                    d.hp--;
+                }
 
                 if (d.hp <= 0) {
                     createExplosion(d.position.x, d.position.y, 50, "cyan");
                     playExplosionSound();
-                    drones.splice(i, 1);
-                }
-                break;
+                drones.splice(i, 1);
             }
+            break;
         }
+    }
 
         // Drone touches player → -1 life, no crash
         if (distance(d.center, player.position) < d.size / 2) {
