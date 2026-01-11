@@ -73,10 +73,13 @@ function drawBlueStars() {
 }
 
 function drawOrangeStars() {
+    c.save();
+    c.scale(0.5, 0.5);
     c.fillStyle = "orange";
+
     orangeStars.forEach(s => {
         c.beginPath();
-        c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        c.arc(s.x * 2, s.y * 2, s.size * 2, 0, Math.PI * 2);
         c.fill();
 
         s.y += s.speed;
@@ -85,8 +88,9 @@ function drawOrangeStars() {
             s.x = Math.random() * canvas.width;
         }
     });
-}
 
+    c.restore();
+}
 
 // ========================
 // Sound
@@ -543,7 +547,8 @@ class Player {
         this.height = config.height;
         this.speed = config.speed;
         this.lives = config.lives;
-        this.fireRate = 320;        // Zeit zwischen Schüssen
+        this.baseFireRate = 300;        // Zeit zwischen Schüssen
+        this.fireRate = this.baseFireRate;
         this.lastShot = 0;
         this.bulletSize = 5;
         this.spread = false;
@@ -835,8 +840,13 @@ class Enemy2 {
     update() {
         this.position.x += this.speed * this.direction;
 
-        if (this.position.x < 0 || this.position.x + this.width > canvas.width) {
-            this.direction *= -1;
+        if (this.position.x < 0) {
+            this.position.x = 0;
+            this.direction = 1;
+        }
+        if (this.position.x + this.width > canvas.width) {
+            this.position.x = canvas.width - this.width;
+            this.direction = -1;
         }
 
         if (Date.now() - this.lastShot > 1200) {
@@ -888,10 +898,13 @@ class Enemy3 {
 
     update() {
         // Direkt auf den Spieler zielen
+        if (!player || !player.position) return;
+
         const angle = Math.atan2(
-            player.position.y - this.position.y,
-            player.position.x - this.position.x
-        );
+                player.position.y - this.position.y,
+                player.position.x - this.position.x
+            );
+        
 
         this.position.x += Math.cos(angle) * this.speed;
         this.position.y += Math.sin(angle) * this.speed;
@@ -1383,7 +1396,7 @@ class Boss2 {
 
     updateLaser() {
         if (!this.laserActive) return;
-
+        if (!this.position) return;
         this.laserCharge--;
 
         // Warnphase
@@ -1761,7 +1774,7 @@ setInterval(() => {
 setInterval(() => {
     if (paused || !gameStarted || gameOver) return;
 
-    if (gameState === "stage3") {
+    if (gameState === "stage3" && enemies3.length < 6) {
         enemies3.push(
             new Enemy3(Math.random() * canvas.width, -50)
         );
@@ -1772,7 +1785,9 @@ setInterval(() => {
 setInterval(() => {
     if (paused || !gameStarted || gameOver) return;
 
-    rocks.push(new Rock());
+    if (gameState !== "stage3" && gameState !== "boss3") {
+        rocks.push(new Rock());
+    }
 }, 3000);
  // alle 3 Sekunden ein Felsen
 
@@ -2116,7 +2131,7 @@ function animate() {
         e.update();
 
         // Player Kollision → Explosion & Schaden
-        if (distance(e.position, player.position) < 35) {
+        if (player && player.position && distance(e.position, player.position) < 35) {
             createExplosion(e.position.x, e.position.y, 40, "red");
             playExplosionSound();
             enemies3.splice(i, 1);
@@ -2234,13 +2249,15 @@ function animate() {
             playExplosionSound();
             createExplosion(bx, by, 80, "red");
 
-            gameState = "stage2";
-            stateTimer = 0;
-            stageText = "STAGE 2";
-            showStage = true;
-            stageAlpha = 1;
-        }
+            if (gameState === "boss1") {
+                gameState = "stage2";
+                stateTimer = 0;
+                stageText = "STAGE 2";
+                showStage = true;
+                stageAlpha = 1;
+            }
 
+        }
     }
 
     if (boss2) {
@@ -2335,7 +2352,7 @@ function activatePowerUp(type) {
 
             clearTimeout(player.rapidTimer);
             player.rapidTimer = setTimeout(() => {
-                player.fireRate = 450;
+                player.fireRate = player.baseFireRate;
             }, 10000);
             break;
 
@@ -2425,6 +2442,9 @@ function showStartScreen() {
 function endGame(victory) {
     if (gameOver) return;
     gameOver = true;
+    const lifeBonus = player.lives * 2000;
+    score += lifeBonus;
+    scoreEl.textContent = score;
 
     const wasFullscreen = document.fullscreenElement !== null;
 
@@ -2451,7 +2471,10 @@ function endGame(victory) {
 
     overlay.innerHTML = `
         <h1>${victory ? "YOU WIN 🚀" : "GAME OVER 💀"}</h1>
-        <p>Score: ${score}</p>
+        <p>Base Score: ${score - lifeBonus}</p>
+        <p>Life Bonus: ${player.lives} × 2000 = ${lifeBonus}</p>
+        <hr style="width:300px; margin:20px 0;">
+        <p><b>Final Score: ${score}</b></p>
         <p>Zeit überlebt: ${timeSurvived}s</p>
         <p>Gegner zerstört: ${stats.enemiesKilled}</p>
         <p>Bosse besiegt: ${stats.bossesKilled}</p>
