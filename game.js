@@ -114,6 +114,7 @@ function playExplosionSound() {
 
 // UI
 const ui = document.getElementById("gameWrapper");
+const hud = document.getElementById("ui");
 const scoreEl = ui.querySelector("#score");
 const livesEl = ui.querySelector("#lives");
 const bombsEl = ui.querySelector("#bombs");
@@ -131,6 +132,7 @@ let boss2 = null;
 let gameState = "stage1"; 
 let stateTimer = 0;
 let finalBossSpawned = false;
+let paused = false;
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -202,7 +204,6 @@ addEventListener("mouseup", () => {
     mouseDown = false;
 });
 
-
 window.addEventListener("keydown", e => {
     const key = e.key.toLowerCase();
 
@@ -224,11 +225,21 @@ window.addEventListener("keydown", e => {
         showStage = true;
         stageAlpha = 1;
         canvas.focus();
+        hud.style.display = "block";
         animate();
     }
 
     if (key === " " && gameStarted && !gameOver) {
         player.useBomb();
+    }
+
+    if (key === "p" && gameStarted) {
+        paused = !paused;
+        if (paused) {
+            hud.style.display = "none";
+        } else {
+            hud.style.display = "block";
+        }  
     }
 });
 
@@ -348,6 +359,65 @@ function detonateBomb(x, y) {
     }
 }
 
+function drawPauseScreen() {
+    // 🔒 Canvas komplett resetten
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    c.shadowColor = "transparent";
+    c.shadowBlur = 0;
+    c.lineWidth = 1;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+
+    // Hintergrund
+    c.fillStyle = "rgba(0,0,0,0.8)";
+    c.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Titel
+    c.fillStyle = "white";
+    c.font = "bold 64px Arial";
+    c.fillText("PAUSED", canvas.width / 2, 80);
+
+    c.font = "24px Arial";
+    c.fillText("Press P to continue", canvas.width / 2, 120);
+
+    // Box
+    const w = 600;
+    const h = 360;
+    const x = canvas.width / 2 - w / 2;
+    const y = 170;
+
+    c.fillStyle = "rgba(0,0,0,0.6)";
+    c.fillRect(x, y, w, h);
+
+    c.strokeStyle = "white";
+    c.lineWidth = 2;
+    c.strokeRect(x, y, w, h);
+
+    // Überschrift
+    c.textAlign = "left";
+    c.font = "28px Arial";
+    c.fillStyle = "white";
+    c.fillText("POWER UPS", x + 20, y + 40);
+
+    c.font = "22px Arial";
+
+    const lines = [
+        "Green  - +1 Life",
+        "Yellow - Rapid Fire (10s)",
+        "Orange - Big Bullets (10s)",
+        "Purple - Spread Shot (10s)",
+        "Blue   - Shield",
+        "Bomb   - +1 Bomb"
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+        c.fillText(lines[i], x + 40, y + 80 + i * 40);
+    }
+}
+
+
+
 // ========================
 // SIMPLE PIXEL SPRITES
 // ========================
@@ -360,6 +430,59 @@ function drawShip(x, y, size, color) {
     c.closePath();
     c.fill();
 }
+
+function respawnAtStage() {
+    // Score reset
+    score = 0;
+    scoreEl.textContent = score;
+
+    // Player neu setzen
+    player.position.x = canvas.width / 2;
+    player.position.y = canvas.height - 80;
+    player.shield = 0;
+    player.bombs = 1;
+    bombsEl.textContent = player.bombs;
+    player.spread = false;
+    player.bulletSize = 5;
+    player.fireRate = 320;
+
+    // Alle Projektile & Objekte löschen
+    projectiles.length = 0;
+    enemies.length = 0;
+    enemies2.length = 0;
+    enemies3.length = 0;
+    powerUps.length = 0;
+    rocks.length = 0;
+    particles.length = 0;
+    drones.length = 0;
+    boss3Bombs.length = 0;
+
+    boss = null;
+    boss2 = null;
+    boss3 = null;
+    finalBossSpawned = false;
+
+    // Stage-spezifisch resetten
+    stateTimer = 0;
+
+    if (gameState === "boss1") gameState = "stage1";
+    if (gameState === "boss2") gameState = "stage2";
+    if (gameState === "boss3") gameState = "stage3";
+
+    stageText =
+        gameState === "stage1" ? "STAGE 1" :
+        gameState === "stage2" ? "STAGE 2" :
+        gameState === "stage3" ? "STAGE 3" :
+        gameState === "chaos"  ? "CHAOS" : "";
+
+    showStage = true;
+    stageAlpha = 1;
+
+    // Player bekommt neue Leben für diese Stage
+    player.lives = 3;
+    livesEl.textContent = player.lives;
+}
+
 
 // ========================
 // PLAYER
@@ -1026,7 +1149,7 @@ class Boss {
                 startShake(12, 12);
                 player.lives--;
                 livesEl.textContent = player.lives;
-                if (player.lives <= 0) endGame(false);
+                if (player.lives <= 0) respawnAtStage();
             }
         }
     }
@@ -1262,7 +1385,7 @@ class Boss2 {
                 startShake(14, 14);
                 player.lives--;
                 livesEl.textContent = player.lives;
-                if (player.lives <= 0) endGame(false);
+                if (player.lives <= 0) respawnAtStage();
             }
         }
     }
@@ -1332,7 +1455,7 @@ class Boss3 {
 
         // Touch = instant death
         if (distance(this.center, player.position) < 120) {
-            endGame(false);
+            respawnAtStage();
         }
     }
 
@@ -1394,7 +1517,7 @@ class Boss3 {
         );
 
         if (dist < 25 && !player.isDashing) {
-            endGame(false);
+            respawnAtStage();
         }
     }
 
@@ -1559,41 +1682,49 @@ const drones = [];
 // ========================
 
 setInterval(() => {
+    if (paused || !gameStarted || gameOver) return;
+
     if (gameState === "stage1" || gameState === "stage2" || gameState === "stage3") {
         enemies.push(new Enemy(Math.random() * canvas.width, -20));
     }
-}, 600); // alle 0,6 sek ein enemy1 ind stage 1,2,3
+}, 600);
+ // alle 0,6 sek ein enemy1 ind stage 1,2,3
 
 setInterval(() => {
+    if (paused || !gameStarted || gameOver) return;
+
     if (gameState === "stage2" || gameState === "stage3") {
         enemies2.push(
-            new Enemy2(
-                Math.random() * (canvas.width - 100),
-                40
-            )
+            new Enemy2(Math.random() * (canvas.width - 100), 40)
         );
     }
-}, 2500); // alle 2,5 Sekunden ein enemy2 in stage 2,3
+}, 2500);
+ // alle 2,5 Sekunden ein enemy2 in stage 2,3
 
 setInterval(() => {
+    if (paused || !gameStarted || gameOver) return;
+
     if (gameState === "stage3") {
         enemies3.push(
-            new Enemy3(
-                Math.random() * canvas.width,
-                -50
-            )
+            new Enemy3(Math.random() * canvas.width, -50)
         );
     }
-}, 3500); // alle 3,5 Sekunden ein enemy3 in stage 3
-
+}, 3500);
+ // alle 3,5 Sekunden ein enemy3 in stage 3
 
 setInterval(() => {
+    if (paused || !gameStarted || gameOver) return;
+
     rocks.push(new Rock());
-}, 3000); // alle 3 Sekunden ein Felsen
+}, 3000);
+ // alle 3 Sekunden ein Felsen
 
 setInterval(() => {
+    if (paused || !gameStarted || gameOver) return;
+
     powerUps.push(new PowerUp(Math.random() * canvas.width, -20));
 }, 7000);
+// alle 7 sekunden ein PowerUp
 
 // ========================
 // COLLISION
@@ -1609,6 +1740,14 @@ function distance(a, b) {
 
 function animate() {
     if (!gameStarted || gameOver) return;
+    if (paused) {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = 1;   // 🔥 ganz wichtig
+        drawPauseScreen();
+        requestAnimationFrame(animate);
+        return;
+    }
+
     if (!document.hasFocus()) {
         for (let k in keys) keys[k] = false;
     }
@@ -1728,7 +1867,7 @@ function animate() {
 
             // ===== WIN CONDITION =====
             if (finalBossSpawned && !boss && !boss2) {
-                endGame(true);
+                respawnAtStage();
             }
         break;
 
@@ -1756,27 +1895,26 @@ function animate() {
     player.activeBomb.update();
     }
     rocks.forEach((r, ri) => {
-            r.update();
+        r.update();
 
-            // Wenn unten raus → löschen
-            if (r.position.y > canvas.height) {
-                rocks.splice(ri, 1);
-                return; // wichtig, damit kein weiterer Code auf diesem Rock läuft
-            }
+        // Wenn unten raus → löschen
+        if (r.position.y > canvas.height) {
+            rocks.splice(ri, 1);
+            return; // wichtig, damit kein weiterer Code auf diesem Rock läuft
+        }
 
-            // Spieler trifft Felsen → sofort tot
-            const playerRadius = 20;
+        // Spieler trifft Felsen → sofort tot
+        const playerRadius = 20;
 
-            if (
-                player.position.x > r.position.x - playerRadius &&
-                player.position.x < r.position.x + r.size + playerRadius &&
-                player.position.y > r.position.y - playerRadius &&
-                player.position.y < r.position.y + r.size + playerRadius
-            ) {
-            endGame(false);
-            }
-
-        });
+        if (
+            player.position.x > r.position.x - playerRadius &&
+            player.position.x < r.position.x + r.size + playerRadius &&
+            player.position.y > r.position.y - playerRadius &&
+            player.position.y < r.position.y + r.size + playerRadius
+        ) {
+        respawnAtStage();
+    }
+});
 
     // Projectiles
     projectiles.forEach((p, pi) => {
@@ -1803,7 +1941,7 @@ function animate() {
                 startShake(12, 12);
                 player.lives--;
                 livesEl.textContent = player.lives;
-                if (player.lives <= 0) endGame(false);
+                if (player.lives <= 0) respawnAtStage();
             }
             return;
         }
@@ -1905,7 +2043,7 @@ function animate() {
                 } else {
                     player.lives--;
                     livesEl.textContent = player.lives;
-                    if (player.lives <= 0) endGame(false);
+                    if (player.lives <= 0) respawnAtStage();
                 }
             }
             continue;
@@ -1961,7 +2099,7 @@ function animate() {
 
         // Drone touches player
         if (distance(d.center, player.position) < d.size / 2 && !player.isDashing) {
-            endGame(false);
+            respawnAtStage();
         }
     }
 
@@ -2020,7 +2158,7 @@ function animate() {
         }
         // Spieler berührt Boss2 → tot
         if (distance(boss2.center, player.position) < 80) {
-            endGame(false);
+            respawnAtStage();
         }
     }
 
@@ -2068,7 +2206,7 @@ function animate() {
             createExplosion(b.position.x, b.position.y, 120, "red");
 
             if (distance(b.position, player.position) < 180) {
-                endGame(false);
+                respawnAtStage();
             }
 
             boss3Bombs.splice(i, 1);
@@ -2184,7 +2322,8 @@ function showStartScreen() {
             Left Mouse – Shoot<br>
             Shift – Dash<br>
             Space – Bomb<br>
-            F – Fullscreen
+            F – Fullscreen<br>
+            P – Pause
         </p>
         <br>
         <p style="font-size:26px;">Press ENTER to Start</p>
