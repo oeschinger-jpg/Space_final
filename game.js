@@ -134,6 +134,9 @@ let stateTimer = 0;
 let finalBossSpawned = false;
 let paused = false;
 let justRespawned = false;
+let boss3JustDied = false;
+let abortFrame = false;
+let pendingRespawn = false;
 
 function startShake(strength = 10, duration = 10) {
     shakeStrength = strength;
@@ -347,6 +350,7 @@ function detonateBomb(x, y) {
                 boss3.health -= 400;   // starke Bombe
 
                 if (boss3.health <= 0) {
+                    boss3JustDied = true;
                     const bx = boss3.center.x;
                     const by = boss3.center.y;
                     boss3 = null;
@@ -427,7 +431,9 @@ function drawPauseScreen() {
 }
 
 function takeDamage(amount = 1) {
-    if (player.isDashing) return;
+    if (abortFrame || player.hitCooldown > 0 || player.isDashing) return;
+
+    player.hitCooldown = 20; // 20 Frames Invulnerability
 
     if (player.shield > 0) {
         player.shield -= 40;
@@ -437,10 +443,10 @@ function takeDamage(amount = 1) {
 
     player.lives -= amount;
     livesEl.textContent = player.lives;
-
     startShake(10, 10);
 
     if (player.lives <= 0) {
+        justRespawned = true;
         respawnAtStage();
     }
 }
@@ -458,7 +464,8 @@ function drawShip(x, y, size, color) {
     c.fill();
 }
 
-function respawnAtStage() {
+function dorespawnAtStage() {
+    abortFrame = true;
     justRespawned = true;
     // Score reset
     score = 0;
@@ -511,12 +518,17 @@ function respawnAtStage() {
     livesEl.textContent = player.lives;
 }
 
+function respawnAtStage() {
+    pendingRespawn = true;
+}
+
 
 // ========================
 // PLAYER
 // ========================
 class Player {
     constructor(config) {
+        this.hitCooldown = 0;
         this.width = config.width;
         this.height = config.height;
         this.speed = config.speed;
@@ -568,7 +580,7 @@ class Player {
     }
 
     update() {
-
+        if (this.hitCooldown > 0) this.hitCooldown--;
         this.updateDash();
 
         // Movement WASD
@@ -1160,17 +1172,24 @@ class Boss {
     }
 
        checkLaserHit() {
-        const dx = player.position.x - this.centerX;
-        const dy = player.position.y - this.centerY;
+            if (player.hitCooldown > 0) return;
 
-        const dist = Math.abs(
-            Math.sin(this.laserAngle) * dx - Math.cos(this.laserAngle) * dy
-        );
+            const cx = this.centerX;
+            const cy = this.centerY;
 
-        if (dist < 20) {
-            takeDamage(1);
+            const dx = player.position.x - cx;
+            const dy = player.position.y - cy;
+
+            const a = this.laserAngle;
+            const t = dx * Math.cos(a) + dy * Math.sin(a);
+            if (t < 0) return;
+
+            const perp = Math.abs(dx * Math.sin(a) - dy * Math.cos(a));
+
+            if (perp < 22) {
+        takeDamage(1);
+            }
         }
-    }
 
     get centerX() {
         return this.position.x + this.width / 2;
@@ -1385,15 +1404,18 @@ class Boss2 {
     }
 
     checkLaserHit() {
+        if (player.hitCooldown > 0) return;
+
         const dx = player.position.x - this.center.x;
         const dy = player.position.y - this.center.y;
 
-        const dist = Math.abs(
-            Math.sin(this.laserAngle) * dx -
-            Math.cos(this.laserAngle) * dy
-        );
+        const a = this.laserAngle;
+    const t = dx * Math.cos(a) + dy * Math.sin(a);
+    if (t < 0) return; // Spieler hinter dem Boss
 
-        if (dist < 22) {
+        const perp = Math.abs(dx * Math.sin(a) - dy * Math.cos(a));
+
+        if (perp < 22) {
             takeDamage(1);
         }
     }
@@ -1517,17 +1539,22 @@ class Boss3 {
     }
 
     checkLaserHit() {
+        if (player.hitCooldown > 0) return;
+
         const dx = player.position.x - this.center.x;
         const dy = player.position.y - this.center.y;
-        const dist = Math.abs(
-            Math.sin(this.laserAngle) * dx -
-            Math.cos(this.laserAngle) * dy
-        );
 
-        if (dist < 25 && !player.isDashing) {
+        const a = this.laserAngle;
+        const t = dx * Math.cos(a) + dy * Math.sin(a);
+        if (t < 0) return; // Spieler hinter dem Boss
+
+        const perp = Math.abs(dx * Math.sin(a) - dy * Math.cos(a));
+
+        if (perp < 22) {
             takeDamage(1);
         }
     }
+
 
     draw() {
         if (sprites.boss3 && sprites.boss3.complete) {
@@ -1748,11 +1775,30 @@ function distance(a, b) {
 
 function animate() {
     if (!gameStarted || gameOver) return;
+    if (pendingRespawn) {
+        pendingRespawn = false;
+        dorespawnAtStage();
+        requestAnimationFrame(animate);
+        return;
+    }
+
+    if (abortFrame) {
+        abortFrame = false;
+        requestAnimationFrame(animate);
+        return;
+    }
+
     if (justRespawned) {
         justRespawned = false;
         requestAnimationFrame(animate);
         return;
     }
+    if (boss3JustDied) {
+    boss3JustDied = false;
+    requestAnimationFrame(animate);
+    return;
+}
+
     if (paused) {
         c.setTransform(1, 0, 0, 1, 0, 0);
         c.globalAlpha = 1;   // 🔥 ganz wichtig
@@ -1907,16 +1953,17 @@ function animate() {
     if (player.activeBomb) {
     player.activeBomb.update();
     }
-    rocks.forEach((r, ri) => {
+    for (let ri = rocks.length - 1; ri >= 0; ri--) {
+        if (abortFrame) break;
+
+        const r = rocks[ri];
         r.update();
 
-        // Wenn unten raus → löschen
         if (r.position.y > canvas.height) {
             rocks.splice(ri, 1);
-            return; // wichtig, damit kein weiterer Code auf diesem Rock läuft
+            continue;
         }
 
-        // Spieler trifft Felsen → -1 life
         const playerRadius = 20;
 
         if (
@@ -1925,41 +1972,35 @@ function animate() {
             player.position.y > r.position.y - playerRadius &&
             player.position.y < r.position.y + r.size + playerRadius
         ) {
-        takeDamage(1);
-        rocks.splice(ri, 1);   // Rock verschwindet
+            takeDamage(1);
+            rocks.splice(ri, 1);
+            break;   // nach Schaden abbrechen
         }
-});
+    }
 
     // Projectiles
-    projectiles.forEach((p, pi) => {
-        p.update();
+    for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+        if (abortFrame) break;
 
+        const p = projectiles[pi];
+        p.update();
         if (
             p.position.x < 0 || p.position.x > canvas.width ||
             p.position.y < 0 || p.position.y > canvas.height
         ) {
             projectiles.splice(pi, 1);
-            return;
+            continue;
         }
 
         // === Spieler trifft Projektil ===
         if (p.fromEnemy && distance(p.position, player.position) < 20) {
             projectiles.splice(pi, 1);
 
-            if (player.isDashing) return;
-
-            if (player.shield > 0) {
-                player.shield -= 25;
-                if (player.shield < 0) player.shield = 0;
-            } else {
-                startShake(12, 12);
-                player.lives--;
-                livesEl.textContent = player.lives;
-                if (player.lives <= 0) respawnAtStage();
+            if (!player.isDashing) {
+                takeDamage(1);
             }
-            return;
+            continue;   // 🔥 nur dieses Projektil, nicht das Spiel
         }
-
         // === Boss2 Hit ===
         if (boss2 && !p.fromEnemy) {
             const dx = p.position.x - boss2.center.x;
@@ -1985,7 +2026,7 @@ function animate() {
                 }
             }
         }
-    });
+    };
 
     particles.forEach((p, i) => {
         p.update();
