@@ -503,9 +503,13 @@ function dorespawnAtStage() {
 }
 
 function respawnAtStage() {
+    // 🔥 Im Chaos-Finale kein Respawn mehr erlaubt
+    if (gameState === "chaos" && finalBossSpawned) {
+        endGame(false);   // Niederlage
+        return;
+    }
     pendingRespawn = true;
 }
-
 
 // ========================
 // PLAYER
