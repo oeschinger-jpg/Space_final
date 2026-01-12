@@ -8,6 +8,14 @@ const c = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// =========================
+// Framerate Setup
+// =========================
+
+let lastFrameTime = 0;
+const TARGET_FPS = 90;   // 30 = Retro, 60 = normal, 120 = smooth
+const FRAME_TIME = 1000 / TARGET_FPS;
+
 // =======================
 // Stars
 // =======================
@@ -813,11 +821,10 @@ class Enemy {
 
 
     update() {
-    let speed = player.enemySlow ? 0.2 : 0.8;
-    this.position.y += speed;
-    this.draw();
+        let speed = player.enemySlow ? 0.2 : 0.8;
+        this.position.y += speed;
+        this.draw();
     }
-
 
     shoot() {
         if (Math.random() < 0.005) {
@@ -1822,8 +1829,16 @@ function distance(a, b) {
 // MAIN LOOP
 // ========================
 
-function animate() {
+function animate(time) {
     if (!gameStarted || gameOver) return;
+    
+    if (time - lastFrameTime < FRAME_TIME) {
+        requestAnimationFrame(animate);
+        return;
+    }
+
+    lastFrameTime = time;
+
     if (pendingRespawn) {
         pendingRespawn = false;
         dorespawnAtStage();
