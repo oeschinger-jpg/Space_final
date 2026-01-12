@@ -8,6 +8,10 @@ const c = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// =======================
+// Stars
+// =======================
+
 const stars = [];
 
 for (let i = 0; i < 80; i++) {
@@ -23,6 +27,17 @@ const blueStars = [];
 
 for (let i = 0; i < 40; i++) {
     blueStars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 1.5 + 0.5,
+        speed: Math.random() * 1.5 + 0.5
+    });
+}
+
+const orangeStars = [];
+
+for (let i = 0; i < 40; i++) {
+    orangeStars.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         size: Math.random() * 1.5 + 0.5,
@@ -63,7 +78,7 @@ function drawBlueStars() {
 
 function drawOrangeStars() {
     c.fillStyle = "#de8510";
-    blueStars.forEach(s => {
+    orangeStars.forEach(s => {
         c.beginPath();
         c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
         c.fill();
@@ -109,8 +124,6 @@ const hud = document.getElementById("ui");
 const scoreEl = ui.querySelector("#score");
 const livesEl = ui.querySelector("#lives");
 const bombsEl = ui.querySelector("#bombs");
-const boss3Bombs = [];
-
 
 let score = 0;
 let gameStarted = false;
@@ -142,6 +155,10 @@ let stats = {
     bossesKilled: 0
 };
 
+// =======================
+// Sprites
+// =======================
+
 const sprites = {};
 
 function loadSprite(name, src) {
@@ -149,10 +166,6 @@ function loadSprite(name, src) {
     img.src = src;
     sprites[name] = img;
 }
-
-// =======================
-// Sprites
-// =======================
 
 loadSprite("player", "sprites/player.png");
 loadSprite("enemy", "sprites/enemy.png");
@@ -174,6 +187,7 @@ loadSprite("bomb", "sprites/bomb.png");
 // ========================
 // INPUT
 // ========================
+
 function resetKeys() {
     for (let k in keys) keys[k] = false;
 }
@@ -537,6 +551,7 @@ function respawnAtStage() {
 // ========================
 // PLAYER
 // ========================
+
 class Player {
     constructor(config) {
         this.hitCooldown = 0;
@@ -664,7 +679,6 @@ class Player {
             })
         );
 
-
         // Spread Shot
         if (this.spread) {
             for (let offset of [-0.3, 0.3]) {
@@ -709,6 +723,7 @@ class Player {
 // ========================
 // PROJECTILES
 // ========================
+
 class Projectile {
     constructor({ x, y, vx, vy, fromEnemy, radius = 5, damage = 5 }) {
         this.position = { x, y };
@@ -1732,6 +1747,7 @@ const enemies3 = [];
 const powerUps = [];
 const rocks = [];
 const particles = [];
+const boss3Bombs = [];
 const MAX_PARTICLES = 400;
 let boss3 = null;
 const drones = [];
@@ -1851,7 +1867,7 @@ function animate() {
     switch (gameState) {
 
         case "stage1":
-            if (stateTimer > 1800) {   // 30 Sekunden
+            if (stateTimer > 1800) {  
                 boss = new Boss();
                 gameState = "boss1";
                 stateTimer = 0;
@@ -1989,7 +2005,7 @@ function animate() {
         player.shoot();
     }
     if (player.activeBomb) {
-    player.activeBomb.update();
+        player.activeBomb.update();
     }
     for (let ri = rocks.length - 1; ri >= 0; ri--) {
         if (abortFrame) break;
@@ -2030,7 +2046,7 @@ function animate() {
             continue;
         }
 
-        // === Spieler trifft Projektil ===
+        // === Projektil trifft Spieler ===
         if (p.fromEnemy && distance(p.position, player.position) < 20) {
             projectiles.splice(pi, 1);
 
