@@ -61,6 +61,21 @@ function drawBlueStars() {
     });
 }
 
+function drawOrangeStars() {
+    c.fillStyle = "#de8510";
+    blueStars.forEach(s => {
+        c.beginPath();
+        c.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        c.fill();
+
+        s.y += s.speed;
+        if (s.y > canvas.height) {
+            s.y = 0;
+            s.x = Math.random() * canvas.width;
+        }
+    });
+}
+
 // ========================
 // Sound
 // ========================
@@ -85,7 +100,10 @@ function playExplosionSound() {
     playSound(sound);
 }
 
+// ========================
 // UI
+// ========================
+
 const ui = document.getElementById("gameWrapper");
 const hud = document.getElementById("ui");
 const scoreEl = ui.querySelector("#score");
@@ -131,6 +149,10 @@ function loadSprite(name, src) {
     img.src = src;
     sprites[name] = img;
 }
+
+// =======================
+// Sprites
+// =======================
 
 loadSprite("player", "sprites/player.png");
 loadSprite("enemy", "sprites/enemy.png");
@@ -438,6 +460,7 @@ function takeDamage(amount = 1) {
 // ========================
 // SIMPLE PIXEL SPRITES
 // ========================
+
 function drawShip(x, y, size, color) {
     c.fillStyle = color;
     c.beginPath();
@@ -1713,7 +1736,6 @@ const MAX_PARTICLES = 400;
 let boss3 = null;
 const drones = [];
 
-
 // ========================
 // SPAWN ENEMIES & POWERUPS
 // ========================
@@ -1954,14 +1976,16 @@ function animate() {
         offsetX = (Math.random() - 0.5) * shakeStrength;
         offsetY = (Math.random() - 0.5) * shakeStrength;
     }
-
+    // Camerashake
     c.setTransform(1, 0, 0, 1, offsetX, offsetY);
     c.fillStyle = "rgba(0,0,0,0.4)";
     c.fillRect(-offsetX, -offsetY, canvas.width, canvas.height);
     drawStars();
     if (gameState === "stage2" || gameState === "boss2") drawBlueStars();
     player.update();
-        if (mouseDown && !gameOver && gameStarted) {
+    if (gameState === "stage3" || gameState === "boss3") drawOrangeStars();
+    player.update();
+    if (mouseDown && !gameOver && gameStarted) {
         player.shoot();
     }
     if (player.activeBomb) {
